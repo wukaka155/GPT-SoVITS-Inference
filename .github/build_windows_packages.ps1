@@ -177,18 +177,19 @@ if (-not $msUser -or -not $msToken) {
     Write-Error "Missing MODELSCOPE_USERNAME or MODELSCOPE_TOKEN"
     exit 1
 }
-modelscope upload "$msUser/GPT-SoVITS-Packages" "$7zPath" "$7zPath" --repo-type model --token $msToken
+
+modelscope upload "$msUser/GPT-SoVITS-Inference" "$7zPath" "$7zPath" --repo-type model --token $msToken
 
 Write-Host "[SUCCESS] Uploaded: $7zPath to ModelScope"
 
-Write-Host "[INFO] Uploading to HuggingFace..."
-$hfUser = $env:HUGGINGFACE_USERNAME
-$hfToken = $env:HUGGINGFACE_TOKEN
-if (-not $hfUser -or -not $hfToken) {
-    Write-Error "Missing HUGGINGFACE_USERNAME or HUGGINGFACE_TOKEN"
-    exit 1
-}
-$env:HF_HUB_ENABLE_HF_TRANSFER = "1"
-huggingface-cli upload "$hfUser/GPT-SoVITS-Packages" "$7zPath" "$7zPath" --repo-type model --token $hfToken
+# Write-Host "[INFO] Uploading to HuggingFace..."
+# $hfUser = $env:HUGGINGFACE_USERNAME
+# $hfToken = $env:HUGGINGFACE_TOKEN
+# if (-not $hfUser -or -not $hfToken) {
+#     Write-Error "Missing HUGGINGFACE_USERNAME or HUGGINGFACE_TOKEN"
+#     exit 1
+# }
+# $env:HF_HUB_ENABLE_HF_TRANSFER = "1"
+# huggingface-cli upload "$hfUser/GPT-SoVITS-Packages" "$7zPath" "$7zPath" --repo-type model --token $hfToken
 
-Write-Host "[SUCCESS] Uploaded: $7zPath to HuggingFace"
+# Write-Host "[SUCCESS] Uploaded: $7zPath to HuggingFace"
