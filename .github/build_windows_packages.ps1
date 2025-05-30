@@ -190,6 +190,6 @@ Write-Host "[SUCCESS] Uploaded: $7zPath to ModelScope"
 #     exit 1
 # }
 # $env:HF_HUB_ENABLE_HF_TRANSFER = "1"
-# huggingface-cli upload "$hfUser/GPT-SoVITS-Packages" "$7zPath" "$7zPath" --repo-type model --token $hfToken
+# huggingface-cli upload "$hfUser/GPT-SoVITS-Inference" "$7zPath" "$7zPath" --repo-type model --token $hfToken
 
 # Write-Host "[SUCCESS] Uploaded: $7zPath to HuggingFace"
