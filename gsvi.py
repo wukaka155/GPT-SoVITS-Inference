@@ -8,7 +8,6 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from startup.functions import start
 import argparse
 import uvicorn
 from pathlib import Path
