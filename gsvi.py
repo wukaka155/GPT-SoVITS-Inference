@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description="TTS Inference API")
 parser.add_argument("-s","--host", type=str, default="0.0.0.0", help="主机地址")
 parser.add_argument("-p","--port", type=int, default=8000, help="端口")
 parser.add_argument("-k","--key", type=str, default="", help="推理密钥")
-parser.add_argument("-d","--device", type=str, default="cuda", help="推理设备(cuda/cpu)")
+parser.add_argument("-c","--config", type=str, default="./GPT_SoVITS/configs/tts_infer.yaml", help="配置文件路径")
 parser.add_argument("-r","--ref_audio", type=str, default="./custom_refs", help="参考音频路径")
 args = parser.parse_args()
     
@@ -28,10 +28,7 @@ host = args.host
 port = args.port
 ref_audio_path = args.ref_audio
     
-if args.device == "cuda":
-    pre_infer("GPT_SoVITS/configs/tts_infer.yaml", ref_audio_path)
-else:
-    pre_infer("GPT_SoVITS/configs/tts_infer_cpu.yaml", ref_audio_path)
+pre_infer(args.config, ref_audio_path)
 
 #===========================启动服务===========================
 origin = ["*"] # 允许所有来源的请求

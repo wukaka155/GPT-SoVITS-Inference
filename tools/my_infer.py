@@ -21,17 +21,30 @@ from time import time
 from datetime import datetime
 from pydub import AudioSegment
 from shutil import move, rmtree
+from config import is_half, infer_device
 
 #===============推理预备================
+    
 def pre_infer(config_path, ref_audio_path):
     global tts_config, tts_pipeline
     if config_path in [None, ""]:
         config_path = "GPT-SoVITS/configs/tts_infer.yaml"
+    
+    tts_config = TTS_Config(config_path)
+    
+    if torch.cuda.is_available():
+        tts_config.device = "cuda"
+    else:
+        tts_config.device = infer_device
+        
+    tts_config.is_half = is_half
+
     Path(ref_audio_path).mkdir(parents=True, exist_ok=True)
     Path("outputs").mkdir(parents=True, exist_ok=True)
     Path("cache").mkdir(parents=True, exist_ok=True)
-    tts_config = TTS_Config(config_path)
+    
     tts_pipeline = TTS(tts_config)
+    
     
     
 def load_weights(gpt, sovits):
@@ -39,6 +52,7 @@ def load_weights(gpt, sovits):
         tts_pipeline.init_t2s_weights(gpt)
     if sovits != "":
         tts_pipeline.init_vits_weights(sovits)
+
     
 #===============推理函数================
 def pack_ogg(io_buffer:BytesIO, data:np.ndarray, rate:int):
@@ -219,7 +233,7 @@ def move_model_files(version, categroy, lang, model):
 #===============接口函数================
 # 获取支持的版本
 def get_version():
-    versions = ["v2", "v3", "v4"]
+    versions = ["v2", "v3", "v4", "v2Pro", "v2ProPlus"]
     return versions
 
 def check_versions(version):
@@ -365,6 +379,18 @@ def get_classic_model_list(version):
         gpt_models = glob("GPT_weights_v4/*.ckpt")
         sovits_models = glob("SoVITS_weights_v4/*.pth")
         msg = "获取成功，当前版本为 v4"
+    elif version == "v2Pro":
+        gpt_models = glob("GPT_weights_v2Pro/*.ckpt")
+        sovits_models = glob("SoVITS_weights_v2Pro/*.pth")
+        msg = "获取成功，当前版本为 v2Pro"
+    elif version == "v2ProPlus":
+        gpt_models = glob("GPT_weights_v2ProPlus/*.ckpt")
+        sovits_models = glob("SoVITS_weights_v2ProPlus/*.pth")
+        msg = "获取成功，当前版本为 v2ProPlus"
+    else:
+        gpt_models = []
+        sovits_models = []
+        msg = "不支持该版本！"
     
     
     for gpt_model in gpt_models:
@@ -388,9 +414,18 @@ def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text
         elif version == "v3":
             gpt_model = f"GPT_weights_v3/{gpt_model_name}"
             sovits_model = f"SoVITS_weights_v3/{sovits_model_name}"
-        else:
+        elif version == "v4":
             gpt_model = f"GPT_weights_v4/{gpt_model_name}"
             sovits_model = f"SoVITS_weights_v4/{sovits_model_name}"
+        elif version == "v2Pro":
+            gpt_model = f"GPT_weights_v2Pro/{gpt_model_name}"
+            sovits_model = f"SoVITS_weights_v2Pro/{sovits_model_name}"
+        elif version == "v2ProPlus":
+            gpt_model = f"GPT_weights_v2ProPlus/{gpt_model_name}"
+            sovits_model = f"SoVITS_weights_v2ProPlus/{sovits_model_name}"
+        else:
+            gpt_model = ""
+            sovits_model = ""
         
         if gpt_model_name == "":
             msg = "无 GPT 模型"
