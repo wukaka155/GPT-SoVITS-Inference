@@ -24,9 +24,18 @@ from shutil import move, rmtree
 from config import is_half, infer_device
 
 #===============推理预备================
+def create_weight_dirs():
+    gpt_dirs = ["GPT_weights", "GPT_weights_v2", "GPT_weights_v3", "GPT_weights_v4", "GPT_weights_v2Pro", "GPT_weights_v2ProPlus"]
+    sovits_dirs = ["SoVITS_weights", "SoVITS_weights_v2", "SoVITS_weights_v3", "SoVITS_weights_v4", "SoVITS_weights_v2Pro", "SoVITS_weights_v2ProPlus"]
+    for gpt_dir in gpt_dirs:
+        Path(gpt_dir).mkdir(parents=True, exist_ok=True)
+        
+    for sovits_dir in sovits_dirs:
+        Path(sovits_dir).mkdir(parents=True, exist_ok=True)
     
 def pre_infer(config_path, ref_audio_path):
     global tts_config, tts_pipeline
+    create_weight_dirs()
     if config_path in [None, ""]:
         config_path = "GPT-SoVITS/configs/tts_infer.yaml"
     
