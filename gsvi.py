@@ -13,6 +13,8 @@ import uvicorn
 from pathlib import Path
 import webbrowser
 import signal
+import mimetypes
+mimetypes.add_type('application/javascript', '.js')
 
 #===========================启动参数===========================
 parser = argparse.ArgumentParser(description="TTS Inference API")
