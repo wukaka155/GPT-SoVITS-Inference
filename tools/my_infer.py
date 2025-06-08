@@ -21,7 +21,8 @@ from time import time
 from datetime import datetime
 from pydub import AudioSegment
 from shutil import move, rmtree
-from config import is_half, infer_device
+from config import is_half, infer_device, force_half_infer, force_gpu_infer
+from GPT_SoVITS.sv import SV
 
 #===============推理预备================
 def create_weight_dirs():
@@ -41,19 +42,26 @@ def pre_infer(config_path, ref_audio_path):
     
     tts_config = TTS_Config(config_path)
     
-    if torch.cuda.is_available():
-        tts_config.device = "cuda"
+    if force_gpu_infer:
+        if torch.cuda.is_available():
+            tts_config.device = "cuda"
+            tts_config.is_half = is_half
+            if force_half_infer:
+                tts_config.is_half = True
+        else:
+            tts_config.device = "cpu"
+            tts_config.is_half = False
+            print("当前无可用 GPU，将使用 CPU 推理。")
+            
     else:
         tts_config.device = infer_device
-        
-    tts_config.is_half = is_half
+        tts_config.is_half = is_half
 
     Path(ref_audio_path).mkdir(parents=True, exist_ok=True)
     Path("outputs").mkdir(parents=True, exist_ok=True)
     Path("cache").mkdir(parents=True, exist_ok=True)
     
     tts_pipeline = TTS(tts_config)
-    
     
     
 def load_weights(gpt, sovits):

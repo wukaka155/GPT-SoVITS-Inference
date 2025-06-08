@@ -1217,7 +1217,8 @@ class TTS:
                     spec=spec.to(dtype=self.precision, device=self.configs.device)
                     refer_audio_spec.append(spec)
                     if self.is_v2pro:
-                        sv_emb.append(self.sv_model.compute_embedding3(audio_tensor))
+                        sv_emb_single = self.sv_model.compute_embedding3(audio_tensor)
+                        sv_emb.append(sv_emb_single.to(dtype=self.precision))
 
                 batch_audio_fragment = []
 

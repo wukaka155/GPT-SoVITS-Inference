@@ -144,7 +144,7 @@ webui_port_subfix = 9871
 
 api_port = 9880
 
-#Thanks to the contribution of @Karasukaigan and @XXXXRT666
+
 def get_device_dtype_sm(idx: int) -> tuple[torch.device, torch.dtype, float, float]:
     cpu = torch.device("cpu")
     cuda = torch.device(f"cuda:{idx}")
@@ -157,10 +157,14 @@ def get_device_dtype_sm(idx: int) -> tuple[torch.device, torch.dtype, float, flo
     mem_gb = mem_bytes / (1024**3) + 0.4
     major, minor = capability
     sm_version = major + minor / 10.0
-    is_16_series = bool(re.search(r"16\d{2}", name))and sm_version == 7.5
-    if mem_gb < 4 or sm_version < 5.3:return cpu, torch.float32, 0.0, 0.0
-    if sm_version == 6.1 or is_16_series==True:return cuda, torch.float32, sm_version, mem_gb
-    if sm_version > 6.1:return cuda, torch.float16, sm_version, mem_gb
+    is_16_series = bool(re.search(r"16\d{2}", name))
+    if mem_gb < 4:
+        return cpu, torch.float32, 0.0, 0.0
+    if (sm_version >= 7.0 and sm_version != 7.5) or (5.3 <= sm_version <= 6.0):
+        if is_16_series and sm_version == 7.5:
+            return cuda, torch.float32, sm_version, mem_gb  # 16系卡除外
+        else:
+            return cuda, torch.float16, sm_version, mem_gb
     return cpu, torch.float32, 0.0, 0.0
 
 
@@ -190,12 +194,21 @@ if not GPU_INFOS:
 infer_device = max(tmp, key=lambda x: (x[2], x[3]))[0]
 is_half = any(dtype == torch.float16 for _, dtype, _, _ in tmp)
 
+#================================仅推理特化包才有================================
+# 强制GPU推理（False 为自动检测，如果实际是 4G 且为N卡，但是识别错误可开）
+force_gpu_infer = False
+
+# 强制半精度推理（False 为自动检测，4G显存如果要推理 V3~V4 可开。对于V2P，如果显卡计算能力低于 SM_53，无法半精部分会强制单精。只有开启了“强制GPU推理”才有效）
+force_half_infer = False
+#==============================================================================
+
 
 class Config:
     def __init__(self):
         self.sovits_path = sovits_path
         self.gpt_path = gpt_path
         self.is_half = is_half
+    
 
         self.cnhubert_path = cnhubert_path
         self.bert_path = bert_path
@@ -212,3 +225,5 @@ class Config:
         self.webui_port_subfix = webui_port_subfix
 
         self.api_port = api_port
+        
+        
