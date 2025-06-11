@@ -23,6 +23,7 @@ from pydub import AudioSegment
 from shutil import move, rmtree
 from config import is_half, infer_device, force_half_infer, force_gpu_infer
 from GPT_SoVITS.sv import SV
+from tqdm import tqdm
 
 #===============推理预备================
 def create_weight_dirs():
@@ -175,10 +176,10 @@ def check_ref_audio_duration(ref_audio_path):
         return False
 
 # 根据情感参考音频文件名分离情感名称和参考文本
-def get_emotion_text(file_name):
-    emotion = split("【|】", file_name)[1]
-    emo_text = split("【|】", file_name)[2]
-    return emotion, emo_text
+def get_tag_text(file_name):
+    tag = split("【|】", file_name)[1]
+    text = split("【|】", file_name)[2]
+    return tag, text
 
 # 获取说话人支持的参考音频语言
 def get_ref_audio_langs(modelname, version):
@@ -195,7 +196,7 @@ def get_ref_audios(modelname, lang, version):
     audio_list = []
     for audio in audios:
         audio_name = Path(audio).name
-        emotion, emo_text = get_emotion_text(audio_name)
+        emotion, emo_text = get_tag_text(audio_name)
         audio_list.append(emotion)
     if Path(f"models/{version}/{modelname}/reference_audios/{lang}/randoms").exists():
         audio_list.append("随机")
@@ -207,7 +208,7 @@ def get_ref_audio(modelname, lang, emotion, version):
     for audio in audios:
         audio_name = str(Path(audio).name).replace(".wav", "")
         if f"【{emotion}】" in audio_name:
-            emo, emo_text = get_emotion_text(audio_name)
+            emo, emo_text = get_tag_text(audio_name)
     return emo, emo_text
 
 # 随机选择参考音频
@@ -381,43 +382,44 @@ def multi_infer(content, top_k, top_p, temperature, text_split_method, batch_siz
 #===============原版兼容================
 # 获取模型列表
 def get_classic_model_list(version):
-    classic_models = {}
+    gpt_model_list = []
+    sovits_model_list = []
+    gpt_model_path_index = {}
+    sovits_model_path_index = {}
     if not check_versions(version):
         msg = "不支持该版本！"
-    elif version == "v2":
-        gpt_models = glob("GPT_weights_v2/*.ckpt")
-        sovits_models = glob("SoVITS_weights_v2/*.pth")
-        msg = "获取成功，当前版本为 v2"
-    elif version == "v3":
-        gpt_models = glob("GPT_weights_v3/*.ckpt")
-        sovits_models = glob("SoVITS_weights_v3/*.pth")
-        msg = "获取成功，当前版本为 v3"
-    elif version == "v4":
-        gpt_models = glob("GPT_weights_v4/*.ckpt")
-        sovits_models = glob("SoVITS_weights_v4/*.pth")
-        msg = "获取成功，当前版本为 v4"
-    elif version == "v2Pro":
-        gpt_models = glob("GPT_weights_v2Pro/*.ckpt")
-        sovits_models = glob("SoVITS_weights_v2Pro/*.pth")
-        msg = "获取成功，当前版本为 v2Pro"
-    elif version == "v2ProPlus":
-        gpt_models = glob("GPT_weights_v2ProPlus/*.ckpt")
-        sovits_models = glob("SoVITS_weights_v2ProPlus/*.pth")
-        msg = "获取成功，当前版本为 v2ProPlus"
     else:
-        gpt_models = []
-        sovits_models = []
-        msg = "不支持该版本！"
-    
-    
-    for gpt_model in gpt_models:
-        gpt_model_name = Path(gpt_model).name
-        exp_name = gpt_model_name.split("-")[0]
-        for sovits_model in sovits_models:
-            sovits_model_name = Path(sovits_model).name
-            if exp_name in sovits_model_name:
-                classic_models[gpt_model_name] = sovits_model_name
-    return classic_models, msg
+        installed_gpt = glob(f"models/{version}/**/*.ckpt", recursive=True)
+        installed_sovits = glob(f"models/{version}/**/*.pth", recursive=True)
+        classic_gpt = glob(f"GPT_weights_{version}/*.ckpt", recursive=True)
+        classic_sovits = glob(f"SoVITS_weights_{version}/*.pth", recursive=True)
+        
+        for inst_gpt in installed_gpt:
+            model_name = Path(inst_gpt).name.replace(".ckpt", "")
+            model_name = f"【GSVI】{model_name}"
+            gpt_model_list.append(model_name)
+            gpt_model_path_index[model_name] = inst_gpt
+            
+        for inst_sovits in installed_sovits:
+            model_name = Path(inst_sovits).name.replace(".pth", "")
+            model_name = f"【GSVI】{model_name}"
+            sovits_model_list.append(model_name)
+            sovits_model_path_index[model_name] = inst_sovits
+            
+        for classic_gpt_model in classic_gpt:
+            model_name = Path(classic_gpt_model).name.replace(".ckpt", "")
+            model_name = f"【经典】{model_name}"
+            gpt_model_list.append(model_name)
+            gpt_model_path_index[model_name] = classic_gpt_model
+            
+        for classic_sovits_model in classic_sovits:
+            model_name = Path(classic_sovits_model).name.replace(".pth", "")
+            model_name = f"【经典】{model_name}"
+            sovits_model_list.append(model_name)
+            sovits_model_path_index[model_name] = classic_sovits_model
+        msg = "获取模型列表成功"
+            
+    return gpt_model_list, sovits_model_list, msg, gpt_model_path_index, sovits_model_path_index
 
 # 推理函数
 def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text, prompt_lang, text, text_lang, top_k, top_p, temperature, text_split_method, batch_size, batch_threshold, split_bucket, speed_facter, fragment_interval, seed, media_type, parallel_infer, repetition_penalty, sample_steps, if_sr, version):
@@ -425,24 +427,10 @@ def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text
     if not check_versions(version):
         msg = "不支持该版本！或没选择版本！"
     else:
-        if version == "v2":
-            gpt_model = f"GPT_weights_v2/{gpt_model_name}"
-            sovits_model = f"SoVITS_weights_v2/{sovits_model_name}"
-        elif version == "v3":
-            gpt_model = f"GPT_weights_v3/{gpt_model_name}"
-            sovits_model = f"SoVITS_weights_v3/{sovits_model_name}"
-        elif version == "v4":
-            gpt_model = f"GPT_weights_v4/{gpt_model_name}"
-            sovits_model = f"SoVITS_weights_v4/{sovits_model_name}"
-        elif version == "v2Pro":
-            gpt_model = f"GPT_weights_v2Pro/{gpt_model_name}"
-            sovits_model = f"SoVITS_weights_v2Pro/{sovits_model_name}"
-        elif version == "v2ProPlus":
-            gpt_model = f"GPT_weights_v2ProPlus/{gpt_model_name}"
-            sovits_model = f"SoVITS_weights_v2ProPlus/{sovits_model_name}"
-        else:
-            gpt_model = ""
-            sovits_model = ""
+        _, _, msg, gpt_model_path_index, sovits_model_path_index = get_classic_model_list(version)
+        
+        gpt_model = gpt_model_path_index.get(gpt_model_name, "")
+        sovits_model = sovits_model_path_index.get(sovits_model_name, "")
         
         if gpt_model_name == "":
             msg = "无 GPT 模型"

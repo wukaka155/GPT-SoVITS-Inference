@@ -13,8 +13,6 @@ import uvicorn
 from pathlib import Path
 import webbrowser
 import signal
-import mimetypes
-mimetypes.add_type('application/javascript', '.js') 
 
 #===========================启动参数===========================
 parser = argparse.ArgumentParser(description="TTS Inference API")
@@ -205,11 +203,13 @@ async def infer_multi(model: inferWithMulti):
 @APP.post("/classic_model_list")
 async def classic_model_list(model: requestVersion):
     try:
-        model_list, msg = get_classic_model_list(model.version)
-    except:
+        gpt, sovits, msg, _, _ = get_classic_model_list(model.version)
+    except Exception as e:
         msg = "获取模型列表失败"
-        model_list = []
-    return {"msg": msg, "model_list": model_list}
+        gpt = []
+        sovits = []
+        print(e)
+    return {"msg": msg, "gpt": gpt, "sovits": sovits}
 
 # 经典模式推理
 @APP.post("/infer_classic")
