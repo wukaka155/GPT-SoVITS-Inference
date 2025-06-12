@@ -13,6 +13,7 @@ import uvicorn
 from pathlib import Path
 import webbrowser
 import signal
+import mimetypes
 
 #===========================启动参数===========================
 parser = argparse.ArgumentParser(description="TTS Inference API")
@@ -32,6 +33,7 @@ pre_infer(args.config, ref_audio_path)
 
 #===========================启动服务===========================
 origin = ["*"] # 允许所有来源的请求
+mimetypes.add_type('application/javascript', '.js')
 
 APP = FastAPI()
 APP.add_middleware(
