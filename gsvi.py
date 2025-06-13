@@ -48,7 +48,7 @@ APP.add_middleware(
 #OpenAI推理接口其它参数
 class otherParams(BaseModel):
     app_key: str = ""
-    text_lang: str = "多语种混合"
+    text_lang: str = "中英混合"
     prompt_lang: str = "中文"
     emotion: str = "默认"
     top_k: int = 10
@@ -70,7 +70,7 @@ class openaiLikeInfer(BaseModel):
     model: Literal["tts-v2", "tts-v3", "tts-v4", "tts-v2Pro", "tts-v2ProPlus"]
     input: str = ""
     voice: str = ""
-    response_format: str = "wav"
+    response_format: str = "mp3"
     speed: float = 1.0
     other_params: otherParams = otherParams()
 
