@@ -3,8 +3,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from tools.my_infer import get_multi_ref_template, create_speaker_list, single_infer, multi_infer, pre_infer, get_classic_model_list, classic_infer, get_version, check_installed, install_model, delete_model, openai_like_infer
-from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import FastAPI, File, UploadFile, Request, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -290,7 +290,7 @@ async def openai_like_infer_func(model: openaiLikeInfer):
                     }
                 }
             else:
-                return StreamingResponse(audio_byte, media_type=f"audio/{model.response_format}")   
+                return Response(content=audio_byte, media_type="audio/wav")
 
     except Exception as e:
         print(e)
