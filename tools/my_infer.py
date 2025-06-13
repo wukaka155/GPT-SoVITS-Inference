@@ -21,9 +21,11 @@ from time import time
 from datetime import datetime
 from pydub import AudioSegment
 from shutil import move, rmtree
+from typing import Generator
 from config import is_half, infer_device, force_half_infer, force_gpu_infer
-from GPT_SoVITS.sv import SV
 from tqdm import tqdm
+from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import get_method
+import wave
 
 #===============推理预备================
 def create_weight_dirs():
@@ -139,7 +141,6 @@ def tts_infer(text, text_lang, ref_audio_path, prompt_text, prompt_lang, top_k, 
         "fragment_interval": fragment_interval,
         "seed": seed,
         "media_type": media_type,
-        "streaming_mode": False,
         "parallel_infer": parallel_infer,
         "repetition_penalty": repetition_penalty,
         "sample_steps": sample_steps,
@@ -150,11 +151,11 @@ def tts_infer(text, text_lang, ref_audio_path, prompt_text, prompt_lang, top_k, 
         sr, audio = next(tts_gen)
         torch.cuda.empty_cache()
         gc.collect()
-    
     audio = pack_audio(BytesIO(), audio, sr, media_type).getvalue()
     
     return audio
 
+#===============音频处理================
 def audio_md5(audio):
     audio_md5 = md5(audio).hexdigest()
     return audio_md5
@@ -455,6 +456,63 @@ def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text
             msg = "合成成功"
     return audio_path, msg
 
+#=========OpenAI语音合成兼容接口=========
+def openai_like_infer(model, input, voice, response_format, speed, other_options: dict = {}):
+    version = model.split("-")[1]
+    if not check_versions(version):
+        msg = "不支持该版本！"
+        audio_data = None
+    elif model == "":
+        msg = "请选择模型"
+        audio_data = None
+    elif input == "":
+        msg = "请提供合成文本"
+        audio_data = None
+    elif voice == "":
+        msg = "请选择说话人"
+        audio_data = None
+    else:
+        if other_options.emotion == "随机":
+            ref_audio, lab_content = random_ref_audio(voice, other_options.prompt_lang, version)
+            prompt_text = lab_content
+        else:
+            emo, prompt_text = get_ref_audio(voice, other_options.prompt_lang, other_options.emotion, version)
+            ref_audio = f"models/{version}/{voice}/reference_audios/{other_options.prompt_lang}/emotions/【{emo}】{prompt_text}.wav"
+        load_model(voice, version)
+        if other_options.seed == -1:
+            seed = random_seed()
+        else:
+            seed = other_options.seed
+            
+        audio_data = tts_infer(
+            input, 
+            other_options.text_lang, 
+            ref_audio, prompt_text, 
+            other_options.prompt_lang, 
+            other_options.top_k, 
+            other_options.top_p, 
+            other_options.temperature, 
+            other_options.text_split_method, 
+            other_options.batch_size, 
+            other_options.batch_threshold, 
+            other_options.split_bucket, 
+            speed, 
+            other_options.fragment_interval, 
+            seed, 
+            response_format, 
+            other_options.parallel_infer, 
+            other_options.repetition_penalty, 
+            other_options.sample_steps, 
+            other_options.if_sr
+            )
+        msg = "合成成功"
+    return audio_data, msg
+            
+            
+    
+        
+        
+        
 #===============一键安装================
 # 检测是否已安装对应模型
 def check_installed(version, categroy, lang, model_name):
@@ -462,6 +520,18 @@ def check_installed(version, categroy, lang, model_name):
         return True
     else:
         return False
+    
+# 检测模型是否成功安装
+def check_model_installed(version, categroy, lang, model_name):
+    if not check_installed(version, categroy, lang, model_name):
+        return False
+    else:
+        gpt_model_files = glob(f'models/{version}/{categroy}-{lang}-{model_name}/*.ckpt', recursive=True)
+        sovits_model_files = glob(f'models/{version}/{categroy}-{lang}-{model_name}/*.pth', recursive=True)
+        if len(gpt_model_files) == 0 or len(sovits_model_files) == 0:
+            return False
+        else:
+            return True
     
 # 安装模型
 def install_model(version, categroy, lang, model_name, model_url):
@@ -484,19 +554,26 @@ def install_model(version, categroy, lang, model_name, model_url):
             subprocess.run(f"./Aria2/aria2c.exe -x16 -s16 -c {model_url} -o cache/{categroy}-{lang}-{model_name}.zip")
         else:
             subprocess.run(f"aria2c -x16 -s16 -c {model_url} -o cache/{categroy}-{lang}-{model_name}.zip", shell=True)
-        print(f"------------------------模型 {categroy}-{lang}-{model_name} 解压中------------------------")
-        Path(f"cache/{categroy}-{lang}-{model_name}").mkdir(parents=True, exist_ok=True)
-        if os.name == "nt":
-            subprocess.run(f"./7-Zip/7za.exe x cache/{categroy}-{lang}-{model_name}.zip -ocache/{categroy}-{lang}-{model_name}",stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if Path(f"cache/{categroy}-{lang}-{model_name}.zip").exists():
+            print(f"------------------------模型 {categroy}-{lang}-{model_name} 解压中------------------------")
+            Path(f"cache/{categroy}-{lang}-{model_name}").mkdir(parents=True, exist_ok=True)
+            if os.name == "nt":
+                subprocess.run(f"./7-Zip/7za.exe x cache/{categroy}-{lang}-{model_name}.zip -ocache/{categroy}-{lang}-{model_name}",stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            else:
+                subprocess.run(f"7za x cache/{categroy}-{lang}-{model_name}.zip -ocache/{categroy}-{lang}-{model_name}", shell=True)
+            print(f"------------------------模型 {categroy}-{lang}-{model_name} 移动中------------------------")
+            move_model_files(version, categroy, lang, model_name)
+            print(f"------------------------清理 {categroy}-{lang}-{model_name} 的缓存------------------------")
+            rmtree(f"cache/{categroy}-{lang}-{model_name}")
+            Path(f"cache/{categroy}-{lang}-{model_name}.zip").unlink()
+            if check_model_installed(version, categroy, lang, model_name):
+                print(f"------------------------模型 {categroy}-{lang}-{model_name} 安装完成------------------------")
+                msg = f"模型 {categroy}-{lang}-{model_name} 安装完成！可在 models/{version} 目录下查看！"
+            else:
+                msg = f"模型 {categroy}-{lang}-{model_name} 安装失败或已损坏，请检查下网络连接！"
+                rmtree(f"models/{version}/{categroy}-{lang}-{model_name}")
         else:
-            subprocess.run(f"7za x cache/{categroy}-{lang}-{model_name}.zip -ocache/{categroy}-{lang}-{model_name}", shell=True)
-        print(f"------------------------模型 {categroy}-{lang}-{model_name} 移动中------------------------")
-        move_model_files(version, categroy, lang, model_name)
-        print(f"------------------------清理 {categroy}-{lang}-{model_name} 的缓存------------------------")
-        rmtree(f"cache/{categroy}-{lang}-{model_name}")
-        Path(f"cache/{categroy}-{lang}-{model_name}.zip").unlink()
-        print(f"------------------------模型 {categroy}-{lang}-{model_name} 安装完成------------------------")
-        msg = f"模型 {categroy}-{lang}-{model_name} 安装完成！可在 models/{version} 目录下查看！"
+            msg = f"模型 {categroy}-{lang}-{model_name} 下载失败，请检查网络连接！"
     return msg
 
 # 删除模型

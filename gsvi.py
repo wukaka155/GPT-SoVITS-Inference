@@ -2,9 +2,9 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from tools.my_infer import get_multi_ref_template, create_speaker_list, single_infer, multi_infer, pre_infer, get_classic_model_list, classic_infer, get_version, check_installed, install_model, delete_model
+from tools.my_infer import get_multi_ref_template, create_speaker_list, single_infer, multi_infer, pre_infer, get_classic_model_list, classic_infer, get_version, check_installed, install_model, delete_model, openai_like_infer
 from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +14,7 @@ from pathlib import Path
 import webbrowser
 import signal
 import mimetypes
+from typing import Literal
 
 #===========================启动参数===========================
 parser = argparse.ArgumentParser(description="TTS Inference API")
@@ -44,6 +45,35 @@ APP.add_middleware(
     allow_headers=["*"],  # 允许的请求头
 )
 
+#OpenAI推理接口其它参数
+class otherParams(BaseModel):
+    app_key: str = ""
+    text_lang: str = "多语种混合"
+    prompt_lang: str = "中文"
+    emotion: str = "默认"
+    top_k: int = 10
+    top_p: float = 1.0
+    temperature: float = 1.0
+    text_split_method: str = "按标点符号切"
+    batch_size: int = 1
+    batch_threshold: float = 0.75
+    split_bucket: bool = True
+    fragment_interval: float = 0.3
+    parallel_infer: bool = True
+    repetition_penalty: float = 1.35
+    sample_steps: int = 16
+    if_sr: bool = False
+    seed: int = -1
+
+#OpenAI风格的推理接口
+class openaiLikeInfer(BaseModel):
+    model: Literal["tts-v2", "tts-v3", "tts-v4", "tts-v2Pro", "tts-v2ProPlus"]
+    input: str = ""
+    voice: str = ""
+    response_format: str = "wav"
+    speed: float = 1.0
+    other_params: otherParams = otherParams()
+
 # 定义请求参数模型
 class requestVersion(BaseModel):
     version: str
@@ -73,7 +103,7 @@ class inferWithEmotions(BaseModel):
     parallel_infer: bool = True
     repetition_penalty: float = 1.35
     seed: int = -1
-    sample_steps: int = 32
+    sample_steps: int = 16
     if_sr : bool = False
     
 class inferWithMulti(BaseModel):
@@ -92,7 +122,7 @@ class inferWithMulti(BaseModel):
     parallel_infer: bool = True
     repetition_penalty: float = 1.35
     seed: int = -1
-    sample_steps: int = 32
+    sample_steps: int = 16
     if_sr : bool = False
     
     
@@ -120,7 +150,7 @@ class inferWithClassic(BaseModel):
     parallel_infer: bool = True
     repetition_penalty: float = 1.35
     seed: int = -1
-    sample_steps: int = 32
+    sample_steps: int = 16
     if_sr : bool = False
     
 class checkModelInstalled(BaseModel):
@@ -234,6 +264,44 @@ async def infer_classic(model: inferWithClassic):
         msg = "参数错误"
         audio_url = ""
     return {"msg": msg, "audio_url": audio_url}
+
+# OpenAI风格的推理接口
+@APP.post("/v1/audio/speech")
+async def openai_like_infer_func(model: openaiLikeInfer):
+    try:
+        if model.other_params.app_key != infer_key and infer_key != "":
+            return {
+                "error": {
+                    "message": "app_key错误",
+                    "type": "authentication_error",
+                    "param": "app_key",
+                    "code": "invalid_app_key"
+                }
+            }
+        else:
+            audio_byte, msg = openai_like_infer(model.model, model.input, model.voice, model.response_format, model.speed, model.other_params)
+            if audio_byte is None:
+                return {
+                    "error": {
+                        "message": msg,
+                        "type": "processing_error",
+                        "param": "unknown",
+                        "code": "processing_failed"
+                    }
+                }
+            else:
+                return StreamingResponse(audio_byte, media_type=f"audio/{model.response_format}")   
+
+    except Exception as e:
+        print(e)
+        return {
+            "error": {
+                "message": "参数错误",
+                "type": "parameter_error",
+                "param": "unknown",
+                "code": "invalid_parameters"
+            }
+        }
 
 # 检查模型是否安装
 @APP.post("/check_model")
