@@ -20,6 +20,7 @@ from pathlib import Path
 import webbrowser
 import signal
 import mimetypes
+logger.success("模块导入完成，可喜可贺！！！")
 
 #===========================启动服务===========================
 
