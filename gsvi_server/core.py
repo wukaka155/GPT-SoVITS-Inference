@@ -3,7 +3,7 @@ import sys
 from .logger import logger
 from .exec_hook import set_exechook
 set_exechook()
-if (3,9 ) < sys.version_info < (3, 11):
+if not (3,9 ) < sys.version_info < (3, 11):
     logger.warning("python版本不在 3.9 - 3.11 之间，可能会遇到模块安装问题，如果你遇到了 ModuleNotFoundError，请安装这个区间内的python.")
 logger.info("开始导入各种模块...")
 from .openai_like_model import (
