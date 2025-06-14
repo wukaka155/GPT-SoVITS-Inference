@@ -277,10 +277,10 @@ def move_model_files(version, categroy, lang, model):
     for file in model_files:
         if file.endswith(".wav"):
             move(file, f"models/{version}/{categroy}-{lang}-{model}/reference_audios/{lang}/emotions")
-            print(f"Moved {file} to models/{version}/{categroy}-{lang}-{model}/reference_audios/{lang}/emotions")
+            logger.info(f"Moved {file} to models/{version}/{categroy}-{lang}-{model}/reference_audios/{lang}/emotions")
         elif file.endswith(".log") or file.endswith(".ckpt") or file.endswith(".pth"):
             move(file, f"models/{version}/{categroy}-{lang}-{model}")
-            print(f"Moved {file} to models/{version}/{categroy}-{lang}-{model}")
+            logger.info(f"Moved {file} to models/{version}/{categroy}-{lang}-{model}")
 
 #===============接口函数================
 def get_version() -> list[str]:
