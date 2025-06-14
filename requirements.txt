@@ -2,6 +2,7 @@
 numpy<2.0
 scipy
 tensorboard
+soundfile
 librosa==0.10.2
 numba
 pytorch-lightning>=2.4
@@ -44,3 +45,4 @@ tokenizers>=0.13,<1
 av>=11
 tqdm
 wmi; sys_platform == 'win32'
+loguru
