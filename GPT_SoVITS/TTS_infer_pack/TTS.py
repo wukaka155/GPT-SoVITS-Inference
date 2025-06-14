@@ -268,7 +268,7 @@ class TTS_Config:
             "bert_base_path": "GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large",
         },
     }
-    configs: dict = None
+    configs: dict = {}
     v1_languages: list = ["auto", "en", "zh", "ja", "all_zh", "all_ja"]
     v2_languages: list = ["auto", "auto_yue", "en", "zh", "ja", "yue", "ko", "all_zh", "all_ja", "all_yue", "all_ko"]
     languages: list = v2_languages
@@ -284,27 +284,27 @@ class TTS_Config:
     # "auto",#多语种启动切分识别语种
     # "auto_yue",#多语种启动切分识别语种
 
-    def __init__(self, configs: Union[dict, str] = None):
+    def __init__(self, config: Union[dict, str] = ""):
         # 设置默认配置文件路径
         configs_base_path: str = "GPT_SoVITS/configs/"
         os.makedirs(configs_base_path, exist_ok=True)
         self.configs_path: str = os.path.join(configs_base_path, "tts_infer.yaml")
 
-        if configs in ["", None]:
+        if config in ["", None]:
             if not os.path.exists(self.configs_path):
                 self.save_configs()
                 print(f"Create default config file at {self.configs_path}")
             configs: dict = deepcopy(self.default_configs)
 
-        if isinstance(configs, str):
-            self.configs_path = configs
+        if isinstance(config, str):
+            self.configs_path = config
             configs: dict = self._load_configs(self.configs_path)
 
-        assert isinstance(configs, dict)
-        version = configs.get("version", "v2").lower()
+        assert isinstance(config, dict)
+        version = config.get("version", "v2").lower()
         assert version in ["v1", "v2", "v3", "v4", "v2Pro", "v2ProPlus"]
-        self.default_configs[version] = configs.get(version, self.default_configs[version])
-        self.configs: dict = configs.get("custom", deepcopy(self.default_configs[version]))
+        self.default_configs[version] = config.get(version, self.default_configs[version])
+        self.configs: dict = config.get("custom", deepcopy(self.default_configs[version]))
 
         self.device = self.configs.get("device", torch.device("cpu"))
         if "cuda" in str(self.device) and not torch.cuda.is_available():

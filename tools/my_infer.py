@@ -10,6 +10,8 @@ import numpy as np
 import soundfile as sf
 import torch
 import gc
+from gsvi_server.openai_like_model import otherParams
+from gsvi_server.logger import logger
 from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
 from glob import glob
 from pathlib import Path
@@ -21,11 +23,8 @@ from time import time
 from datetime import datetime
 from pydub import AudioSegment
 from shutil import move, rmtree
-from typing import Generator
 from config import is_half, infer_device, force_half_infer, force_gpu_infer
-from tqdm import tqdm
 from GPT_SoVITS.TTS_infer_pack.text_segmentation_method import get_method
-import wave
 
 #===============推理预备================
 def create_weight_dirs():
@@ -37,7 +36,7 @@ def create_weight_dirs():
     for sovits_dir in sovits_dirs:
         Path(sovits_dir).mkdir(parents=True, exist_ok=True)
     
-def pre_infer(config_path, ref_audio_path):
+def pre_infer(config_path: str, ref_audio_path: str) -> None:
     global tts_config, tts_pipeline
     create_weight_dirs()
     if config_path in [None, ""]:
@@ -54,7 +53,7 @@ def pre_infer(config_path, ref_audio_path):
         else:
             tts_config.device = "cpu"
             tts_config.is_half = False
-            print("当前无可用 GPU，将使用 CPU 推理。")
+            logger.info("当前无可用 GPU，将使用 CPU 推理。")
             
     else:
         tts_config.device = infer_device
@@ -236,7 +235,9 @@ def get_ref_audios(modelname, lang, version):
     return audio_list
 
 # 获取指定情感的完整参考音频文件名
-def get_ref_audio(modelname, lang, emotion, version):
+def get_ref_audio(modelname: str, lang: str, emotion: str, version: str) -> tuple[str, str]:
+    emo = ""
+    emo_text = ""
     audios = glob(f"models/{version}/{modelname}/reference_audios/{lang}/emotions/*.wav")
     for audio in audios:
         audio_name = str(Path(audio).name).replace(".wav", "")
@@ -282,12 +283,13 @@ def move_model_files(version, categroy, lang, model):
             print(f"Moved {file} to models/{version}/{categroy}-{lang}-{model}")
 
 #===============接口函数================
-# 获取支持的版本
-def get_version():
+def get_version() -> list[str]:
+    """ 获取所有支持版本 """
     versions = ["v2", "v3", "v4", "v2Pro", "v2ProPlus"]
     return versions
 
-def check_versions(version):
+def version_support(version: str) -> bool:
+    """ 检查版本是否支持 """
     support_versions = get_version()
     if version not in support_versions:
         return False
@@ -295,9 +297,10 @@ def check_versions(version):
         return True
 
 # 获取多人对话参考单人模板（不支持自定义参考音频）
-def get_multi_ref_template(version):
+def get_multi_ref_template(version: str) -> tuple[list[str], str]:
+    msg = ""
     template_list = []
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！"
     else:
         speakers = glob(f"models/{version}/*")
@@ -313,7 +316,7 @@ def get_multi_ref_template(version):
 # 创建说话人列表
 def create_speaker_list(version):
     spk_list = {}
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！"
     else:
         speakers = glob(f"models/{version}/*")
@@ -332,7 +335,7 @@ def create_speaker_list(version):
     
 # 根据说话人和情感合成语音（单人合成）
 def single_infer(modelname, prompt_lang, emotion, text, text_lang, top_k, top_p, temperature, text_split_method, batch_size, batch_threshold, split_bucket, speed_facter, fragment_interval, media_type, parallel_infer, repetition_penalty, seed, sample_steps, if_sr, version):
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！或没选择版本！"
         audio_path = ""
     elif modelname == "":
@@ -419,7 +422,7 @@ def get_classic_model_list(version):
     sovits_model_list = []
     gpt_model_path_index = {}
     sovits_model_path_index = {}
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！"
     else:
         installed_gpt = glob(f"models/{version}/**/*.ckpt", recursive=True)
@@ -457,7 +460,7 @@ def get_classic_model_list(version):
 # 推理函数
 def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text, prompt_lang, text, text_lang, top_k, top_p, temperature, text_split_method, batch_size, batch_threshold, split_bucket, speed_facter, fragment_interval, seed, media_type, parallel_infer, repetition_penalty, sample_steps, if_sr, version):
     audio_path = ""
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！或没选择版本！"
     else:
         _, _, msg, gpt_model_path_index, sovits_model_path_index = get_classic_model_list(version)
@@ -489,9 +492,9 @@ def classic_infer(gpt_model_name, sovits_model_name, ref_audio_path, prompt_text
     return audio_path, msg
 
 #=========OpenAI语音合成兼容接口=========
-def openai_like_infer(model, input, voice, response_format, speed, other_options: dict = {}):
+def openai_like_infer(model, input, voice, response_format, speed, other_options: otherParams):
     version = model.split("-")[1]
-    if not check_versions(version):
+    if not version_support(version):
         msg = "不支持该版本！"
         audio_data = None
     elif model == "":
