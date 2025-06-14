@@ -1,4 +1,4 @@
-""" 日志实现 """
+""" 运行日志记录 """
 
 from loguru import logger
 from pathlib import Path

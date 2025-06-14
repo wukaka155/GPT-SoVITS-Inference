@@ -29,7 +29,7 @@ from module.models import SynthesizerTrn, SynthesizerTrnV3, Generator
 from peft import LoraConfig, get_peft_model
 from process_ckpt import get_sovits_version_from_path_fast, load_sovits_new
 from transformers import AutoModelForMaskedLM, AutoTokenizer
-
+from tools.logger import logger
 from tools.audio_sr import AP_BWE
 from tools.i18n.i18n import I18nAuto, scan_language_list
 from tools.my_utils import load_audio
@@ -191,7 +191,7 @@ v4:
 def set_seed(seed: int):
     seed = int(seed)
     seed = seed if seed != -1 else random.randint(0, 2**32 - 1)
-    print(f"Set seed to {seed}")
+    logger.info(f"Set seed to {seed}")
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -272,6 +272,7 @@ class TTS_Config:
     v1_languages: list = ["auto", "en", "zh", "ja", "all_zh", "all_ja"]
     v2_languages: list = ["auto", "auto_yue", "en", "zh", "ja", "yue", "ko", "all_zh", "all_ja", "all_yue", "all_ko"]
     languages: list = v2_languages
+    version = "v2"
     # "all_zh",#全部按中文识别
     # "en",#全部按英文识别#######不变
     # "all_ja",#全部按日文识别
@@ -293,22 +294,24 @@ class TTS_Config:
         if config in ["", None]:
             if not os.path.exists(self.configs_path):
                 self.save_configs()
-                print(f"Create default config file at {self.configs_path}")
+                logger.debug(f"Create default config file at {self.configs_path}")
             configs: dict = deepcopy(self.default_configs)
 
         if isinstance(config, str):
             self.configs_path = config
             configs: dict = self._load_configs(self.configs_path)
 
-        assert isinstance(config, dict)
-        version = config.get("version", "v2").lower()
-        assert version in ["v1", "v2", "v3", "v4", "v2Pro", "v2ProPlus"]
-        self.default_configs[version] = config.get(version, self.default_configs[version])
-        self.configs: dict = config.get("custom", deepcopy(self.default_configs[version]))
+        if isinstance(config, dict):
+            version = config.get("version", "v2").lower()
+            if version not in ["v1", "v2", "v3", "v4", "v2Pro", "v2ProPlus"]:
+                raise RuntimeError(f"版本: {version} 不支持！")
+            self.default_configs[version] = config.get(version, self.default_configs[version])
+            self.configs: dict = config.get("custom", deepcopy(self.default_configs[version]))
+            self.version = version
 
         self.device = self.configs.get("device", torch.device("cpu"))
         if "cuda" in str(self.device) and not torch.cuda.is_available():
-            print("Warning: CUDA is not available, set device to CPU.")
+            logger.warning("CUDA is not available, set device to CPU.")
             self.device = torch.device("cpu")
 
         self.is_half = self.configs.get("is_half", False)
@@ -316,7 +319,6 @@ class TTS_Config:
         #     print(f"Warning: Half precision is not supported on CPU, set is_half to False.")
         #     self.is_half = False
 
-        self.version = version
         self.t2s_weights_path = self.configs.get("t2s_weights_path", None)
         self.vits_weights_path = self.configs.get("vits_weights_path", None)
         self.bert_base_path = self.configs.get("bert_base_path", None)
@@ -325,18 +327,18 @@ class TTS_Config:
 
         self.use_vocoder: bool = False
 
-        if (self.t2s_weights_path in [None, ""]) or (not os.path.exists(self.t2s_weights_path)):
-            self.t2s_weights_path = self.default_configs[version]["t2s_weights_path"]
-            print(f"fall back to default t2s_weights_path: {self.t2s_weights_path}")
-        if (self.vits_weights_path in [None, ""]) or (not os.path.exists(self.vits_weights_path)):
-            self.vits_weights_path = self.default_configs[version]["vits_weights_path"]
-            print(f"fall back to default vits_weights_path: {self.vits_weights_path}")
-        if (self.bert_base_path in [None, ""]) or (not os.path.exists(self.bert_base_path)):
-            self.bert_base_path = self.default_configs[version]["bert_base_path"]
-            print(f"fall back to default bert_base_path: {self.bert_base_path}")
-        if (self.cnhuhbert_base_path in [None, ""]) or (not os.path.exists(self.cnhuhbert_base_path)):
-            self.cnhuhbert_base_path = self.default_configs[version]["cnhuhbert_base_path"]
-            print(f"fall back to default cnhuhbert_base_path: {self.cnhuhbert_base_path}")
+        if (self.t2s_weights_path in [None, ""]) or (not os.path.exists(self.t2s_weights_path)): # type: ignore
+            self.t2s_weights_path = self.default_configs[self.version]["t2s_weights_path"]
+            logger.warning(f"fall back to default t2s_weights_path: {self.t2s_weights_path}")
+        if (self.vits_weights_path in [None, ""]) or (not os.path.exists(self.vits_weights_path)): # type: ignore
+            self.vits_weights_path = self.default_configs[self.version]["vits_weights_path"]
+            logger.warning(f"fall back to default vits_weights_path: {self.vits_weights_path}")
+        if (self.bert_base_path in [None, ""]) or (not os.path.exists(self.bert_base_path)): # type: ignore
+            self.bert_base_path = self.default_configs[self.version]["bert_base_path"]
+            logger.warning(f"fall back to default bert_base_path: {self.bert_base_path}")
+        if (self.cnhuhbert_base_path in [None, ""]) or (not os.path.exists(self.cnhuhbert_base_path)): # type: ignore
+            self.cnhuhbert_base_path = self.default_configs[self.version]["cnhuhbert_base_path"]
+            logger.warning(f"fall back to default cnhuhbert_base_path: {self.cnhuhbert_base_path}")
         self.update_configs()
 
         self.max_sec = None
@@ -353,7 +355,7 @@ class TTS_Config:
         if os.path.exists(configs_path):
             ...
         else:
-            print(i18n("路径不存在,使用默认配置"))
+            logger.warning(i18n("路径不存在,使用默认配置"))
             self.save_configs(configs_path)
         with open(configs_path, "r", encoding="utf-8") as f:
             configs = yaml.load(f, Loader=yaml.FullLoader)
@@ -460,7 +462,7 @@ class TTS:
         # self.enable_half_precision(self.configs.is_half)
 
     def init_cnhuhbert_weights(self, base_path: str):
-        print(f"Loading CNHuBERT weights from {base_path}")
+        logger.info(f"Loading CNHuBERT weights from {base_path}")
         self.cnhuhbert_model = CNHubert(base_path)
         self.cnhuhbert_model = self.cnhuhbert_model.eval()
         self.cnhuhbert_model = self.cnhuhbert_model.to(self.configs.device)
@@ -468,7 +470,7 @@ class TTS:
             self.cnhuhbert_model = self.cnhuhbert_model.half()
 
     def init_bert_weights(self, base_path: str):
-        print(f"Loading BERT weights from {base_path}")
+        logger.info(f"Loading BERT weights from {base_path}")
         self.bert_tokenizer = AutoTokenizer.from_pretrained(base_path)
         self.bert_model = AutoModelForMaskedLM.from_pretrained(base_path)
         self.bert_model = self.bert_model.eval()
@@ -545,11 +547,11 @@ class TTS:
         self.is_v2pro=model_version in {"v2Pro","v2ProPlus"}
 
         if if_lora_v3 == False:
-            print(
+            logger.info(
                 f"Loading VITS weights from {weights_path}. {vits_model.load_state_dict(dict_s2['weight'], strict=False)}"
             )
         else:
-            print(
+            logger.info(
                 f"Loading VITS pretrained weights from {weights_path}. {vits_model.load_state_dict(load_sovits_new(path_sovits)['weight'], strict=False)}"
             )
             lora_rank = dict_s2["lora_rank"]
@@ -560,7 +562,7 @@ class TTS:
                 init_lora_weights=True,
             )
             vits_model.cfm = get_peft_model(vits_model.cfm, lora_config)
-            print(
+            logger.info(
                 f"Loading LoRA weights from {weights_path}. {vits_model.load_state_dict(dict_s2['weight'], strict=False)}"
             )
 
@@ -574,7 +576,7 @@ class TTS:
             self.vits_model = self.vits_model.half()
 
     def init_t2s_weights(self, weights_path: str):
-        print(f"Loading Text2Semantic weights from {weights_path}")
+        logger.info(f"Loading Text2Semantic weights from {weights_path}")
         self.configs.t2s_weights_path = weights_path
         self.configs.save_configs()
         self.configs.hz = 50
@@ -634,7 +636,7 @@ class TTS:
             state_dict_g = torch.load(
                 "%s/GPT_SoVITS/pretrained_models/gsv-v4-pretrained/vocoder.pth" % (now_dir,), map_location="cpu", weights_only=False
             )
-            print("loading vocoder", self.vocoder.load_state_dict(state_dict_g))
+            logger.info("loading vocoder", self.vocoder.load_state_dict(state_dict_g))
 
             self.vocoder_configs["sr"] = 48000
             self.vocoder_configs["T_ref"] = 500
@@ -655,7 +657,7 @@ class TTS:
             self.sr_model: AP_BWE = AP_BWE(self.configs.device, DictToAttrRecursive)
             self.sr_model_not_exist = False
         except FileNotFoundError:
-            print(i18n("你没有下载超分模型的参数，因此不进行超分。如想超分请先参照教程把文件下载好"))
+            logger.info(i18n("你没有下载超分模型的参数，因此不进行超分。如想超分请先参照教程把文件下载好"))
             self.sr_model_not_exist = True
 
     def init_sv_model(self):
@@ -671,7 +673,7 @@ class TTS:
 
         """
         if str(self.configs.device) == "cpu" and enable:
-            print("Half precision is not supported on CPU.")
+            logger.warning("Half precision is not supported on CPU.")
             return
 
         self.configs.is_half = enable
@@ -1026,32 +1028,32 @@ class TTS:
         super_sampling = inputs.get("super_sampling", False)
 
         if parallel_infer:
-            print(i18n("并行推理模式已开启"))
+            logger.info(i18n("并行推理模式已开启"))
             self.t2s_model.model.infer_panel = self.t2s_model.model.infer_panel_batch_infer
         else:
-            print(i18n("并行推理模式已关闭"))
+            logger.info(i18n("并行推理模式已关闭"))
             self.t2s_model.model.infer_panel = self.t2s_model.model.infer_panel_naive_batched
 
         if return_fragment:
-            print(i18n("分段返回模式已开启"))
+            logger.info(i18n("分段返回模式已开启"))
             if split_bucket:
                 split_bucket = False
-                print(i18n("分段返回模式不支持分桶处理，已自动关闭分桶处理"))
+                logger.info(i18n("分段返回模式不支持分桶处理，已自动关闭分桶处理"))
 
         if split_bucket and speed_factor == 1.0 and not (self.configs.use_vocoder and parallel_infer):
-            print(i18n("分桶处理模式已开启"))
+            logger.info(i18n("分桶处理模式已开启"))
         elif speed_factor != 1.0:
-            print(i18n("语速调节不支持分桶处理，已自动关闭分桶处理"))
+            logger.info(i18n("语速调节不支持分桶处理，已自动关闭分桶处理"))
             split_bucket = False
         elif self.configs.use_vocoder and parallel_infer:
-            print(i18n("当开启并行推理模式时，SoVits V3/4模型不支持分桶处理，已自动关闭分桶处理"))
+            logger.info(i18n("当开启并行推理模式时，SoVits V3/4模型不支持分桶处理，已自动关闭分桶处理"))
             split_bucket = False
         else:
-            print(i18n("分桶处理模式已关闭"))
+            logger.info(i18n("分桶处理模式已关闭"))
 
         if fragment_interval < 0.01:
             fragment_interval = 0.01
-            print(i18n("分段间隔过小，已自动设置为0.01"))
+            logger.warning(i18n("分段间隔过小，已自动设置为0.01"))
 
         no_prompt_text = False
         if prompt_text in [None, ""]:
@@ -1087,7 +1089,7 @@ class TTS:
                 if path in [None, ""]:
                     continue
                 if not os.path.exists(path):
-                    print(i18n("音频文件不存在，跳过："), path)
+                    logger.warning(i18n("音频文件不存在，跳过："), path)
                     continue
                 self.prompt_cache["refer_spec"].append(self._get_ref_spec(path))
 
@@ -1095,7 +1097,7 @@ class TTS:
             prompt_text = prompt_text.strip("\n")
             if prompt_text[-1] not in splits:
                 prompt_text += "。" if prompt_lang != "en" else "."
-            print(i18n("实际输入的参考文本:"), prompt_text)
+            logger.info(i18n("实际输入的参考文本:"), prompt_text)
             if self.prompt_cache["prompt_text"] != prompt_text:
                 phones, bert_features, norm_text = self.text_preprocessor.segment_and_extract_feature_for_text(
                     prompt_text, prompt_lang, self.configs.version
@@ -1126,7 +1128,7 @@ class TTS:
                 precision=self.precision,
             )
         else:
-            print(f"############ {i18n('切分文本')} ############")
+            logger.info(f"############ {i18n('切分文本')} ############")
             texts = self.text_preprocessor.pre_seg_text(text, text_lang, text_split_method)
             data = []
             for i in range(len(texts)):
@@ -1136,7 +1138,7 @@ class TTS:
 
             def make_batch(batch_texts):
                 batch_data = []
-                print(f"############ {i18n('提取文本Bert特征')} ############")
+                logger.info(f"############ {i18n('提取文本Bert特征')} ############")
                 for text in tqdm(batch_texts):
                     phones, bert_features, norm_text = self.text_preprocessor.segment_and_extract_feature_for_text(
                         text, text_lang, self.configs.version
@@ -1164,7 +1166,7 @@ class TTS:
 
         t2 = time.perf_counter()
         try:
-            print("############ 推理 ############")
+            logger.info("############ 推理 ############")
             ###### inference ######
             t_34 = 0.0
             t_45 = 0.0
@@ -1186,7 +1188,7 @@ class TTS:
                 norm_text: str = item["norm_text"]
                 max_len = item["max_len"]
 
-                print(i18n("前端处理后的文本(每句):"), norm_text)
+                logger.info(i18n("前端处理后的文本(每句):"), norm_text)
                 if no_prompt_text:
                     prompt = None
                 else:
@@ -1194,7 +1196,7 @@ class TTS:
                         self.prompt_cache["prompt_semantic"].expand(len(all_phoneme_ids), -1).to(self.configs.device)
                     )
 
-                print(f"############ {i18n('预测语义Token')} ############")
+                logger.info(f"############ {i18n('预测语义Token')} ############")
                 pred_semantic_list, idx_list = self.t2s_model.model.infer_panel(
                     all_phoneme_ids,
                     all_phoneme_lens,
@@ -1234,10 +1236,10 @@ class TTS:
                 # batch_audio_fragment = (self.vits_model.batched_decode(
                 #         pred_semantic, pred_semantic_len, batch_phones, batch_phones_len,refer_audio_spec
                 #     ))
-                print(f"############ {i18n('合成音频')} ############")
+                logger.info(f"############ {i18n('合成音频')} ############")
                 if not self.configs.use_vocoder:
                     if speed_factor == 1.0:
-                        print(f"{i18n('并行合成中')}...")
+                        logger.info(f"{i18n('并行合成中')}...")
                         # ## vits并行推理 method 2
                         pred_semantic_list = [item[-idx:] for item, idx in zip(pred_semantic_list, idx_list)]
                         upsample_rate = math.prod(self.vits_model.upsample_rates)
@@ -1273,7 +1275,7 @@ class TTS:
                             batch_audio_fragment.append(audio_fragment)  ###试试重建不带上prompt部分
                 else:
                     if parallel_infer:
-                        print(f"{i18n('并行合成中')}...")
+                        logger.info(f"{i18n('并行合成中')}...")
                         audio_fragments = self.using_vocoder_synthesis_batched_infer(
                             idx_list, pred_semantic_list, batch_phones, speed=speed_factor, sample_steps=sample_steps
                         )
@@ -1292,7 +1294,7 @@ class TTS:
                 t5 = time.perf_counter()
                 t_45 += t5 - t4
                 if return_fragment:
-                    print("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t4 - t3, t5 - t4))
+                    logger.info("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t4 - t3, t5 - t4))
                     yield self.audio_postprocess(
                         [batch_audio_fragment],
                         output_sr,
@@ -1310,7 +1312,7 @@ class TTS:
                     return
 
             if not return_fragment:
-                print("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t_34, t_45))
+                logger.info("%.3f\t%.3f\t%.3f\t%.3f" % (t1 - t0, t2 - t1, t_34, t_45))
                 if len(audio) == 0:
                     yield 16000, np.zeros(int(16000), dtype=np.int16)
                     return
@@ -1325,7 +1327,7 @@ class TTS:
                 )
 
         except Exception as e:
-            traceback.print_exc()
+            logger.exception("发生错误!")
             # 必须返回一个空音频, 否则会导致显存不释放。
             yield 16000, np.zeros(int(16000), dtype=np.int16)
             # 重置模型, 否则会导致显存释放不完全。
@@ -1380,7 +1382,7 @@ class TTS:
         audio = torch.cat(audio, dim=0)
 
         if super_sampling:
-            print(f"############ {i18n('音频超采样')} ############")
+            logger.info(f"############ {i18n('音频超采样')} ############")
             t1 = time.perf_counter()
             self.init_sr_model()
             if not self.sr_model_not_exist:
@@ -1389,7 +1391,7 @@ class TTS:
                 if max_audio > 1:
                     audio /= max_audio
             t2 = time.perf_counter()
-            print(f"超采样用时：{t2 - t1:.3f}s")
+            logger.info(f"超采样用时：{t2 - t1:.3f}s")
         else:
             audio = audio.cpu().numpy()
 

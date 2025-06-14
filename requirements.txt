@@ -2,6 +2,7 @@
 numpy<2.0
 scipy
 tensorboard
+soundfile
 librosa==0.10.2
 numba
 pytorch-lightning>=2.4

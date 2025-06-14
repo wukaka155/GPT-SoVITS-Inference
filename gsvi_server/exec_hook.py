@@ -5,7 +5,7 @@ import multiprocessing
 import threading
 import inspect
 import sys
-from .logger import logger
+from tools.logger import logger
 
 def format_stack_trace(exctype, value, tb, max_depth=15, nested=False) -> list[str]:
     tb_list = traceback.extract_tb(tb)

@@ -11,7 +11,7 @@ import soundfile as sf
 import torch
 import gc
 from gsvi_server.openai_like_model import otherParams
-from gsvi_server.logger import logger
+from tools.logger import logger
 from GPT_SoVITS.TTS_infer_pack.TTS import TTS, TTS_Config
 from glob import glob
 from pathlib import Path
@@ -42,6 +42,7 @@ def pre_infer(config_path: str, ref_audio_path: str) -> None:
     if config_path in [None, ""]:
         config_path = "GPT-SoVITS/configs/tts_infer.yaml"
     
+    logger.debug(f"配置文件路径: {config_path}")
     tts_config = TTS_Config(config_path)
     
     if force_gpu_infer:

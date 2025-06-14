@@ -1,11 +1,13 @@
 import os
 import sys
-from .logger import logger
+import time
+from tools.logger import logger
 from .exec_hook import set_exechook
 set_exechook()
-if not (3,9 ) < sys.version_info < (3, 11):
+if not (3, 9, 12) <= sys.version_info < (3, 12):
     logger.warning("python版本不在 3.9 - 3.11 之间，可能会遇到模块安装问题，如果你遇到了 ModuleNotFoundError，请安装这个区间内的python.")
 logger.info("开始导入各种模块...")
+start_import = time.perf_counter_ns()
 from .openai_like_model import (
     inferWithClassic, inferWithEmotions, inferWithMulti, installModel, checkModelInstalled, openaiLikeInfer, requestVersion, ShutdownRequest
 )
@@ -21,6 +23,8 @@ import webbrowser
 import signal
 import mimetypes
 logger.success("模块导入完成，可喜可贺！！！")
+end_import = time.perf_counter_ns()
+logger.info(f"导入耗时: {end_import - start_import} ns")
 
 #===========================启动服务===========================
 
