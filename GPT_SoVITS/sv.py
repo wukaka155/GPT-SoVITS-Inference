@@ -1,4 +1,6 @@
-import sys,os,torch
+import sys
+import os
+import torch
 sys.path.append(f"{os.getcwd()}/GPT_SoVITS/eres2net")
 sv_path = "GPT_SoVITS/pretrained_models/sv/pretrained_eres2netv2w24s4ep4.ckpt"
 from ERes2NetV2 import ERes2NetV2
