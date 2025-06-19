@@ -1,13 +1,15 @@
 import os
 import sys
-import time
+from datetime import datetime
 from tools.logger import logger
+import pyfiglet
+pyfiglet.print_figlet("G S V I", "standard", "LIGHT_GREEN")
 from .exec_hook import set_exechook
 set_exechook()
 if not (3, 9, 12) <= sys.version_info < (3, 12):
     logger.warning("python版本不在 3.9 - 3.11 之间，可能会遇到模块安装问题，如果你遇到了 ModuleNotFoundError，请安装这个区间内的python.")
 logger.info("开始导入各种模块...")
-start_import = time.perf_counter_ns()
+start_import = datetime.now()
 from .openai_like_model import (
     inferWithClassic, inferWithEmotions, inferWithMulti, installModel, checkModelInstalled, openaiLikeInfer, requestVersion, ShutdownRequest
 )
@@ -23,8 +25,8 @@ import webbrowser
 import signal
 import mimetypes
 logger.success("模块导入完成，可喜可贺！！！")
-end_import = time.perf_counter_ns()
-logger.info(f"导入耗时: {end_import - start_import} ns")
+end_import = datetime.now()
+logger.info(f"导入耗时: {end_import - start_import}")
 
 #===========================启动服务===========================
 
@@ -32,10 +34,13 @@ origin = ["*"] # 允许所有来源的请求
 mimetypes.add_type('application/javascript', '.js')
 
 ### CONSTANTS ###
+
 infer_key: str = ""
 host: str = ""
-port: int = 0000
+port: int = 8000
 ref_audio_path: str = ""
+
+### CONSTANTS ###
 
 APP = FastAPI()
 APP.add_middleware(

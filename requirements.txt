@@ -46,3 +46,4 @@ av>=11
 tqdm
 wmi; sys_platform == 'win32'
 loguru
+pyfiglet
