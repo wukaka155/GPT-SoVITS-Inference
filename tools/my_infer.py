@@ -215,7 +215,7 @@ def get_tag_text(file_name):
     return tag, text
 
 # 获取说话人支持的参考音频语言
-def get_ref_audio_langs(modelname, version):
+def get_ref_audio_langs(modelname: str, version: str) -> list[str]:
     langs = []
     lang_dir = glob(f"models/{version}/{modelname}/reference_audios/*")
     for lang in lang_dir:
@@ -224,7 +224,7 @@ def get_ref_audio_langs(modelname, version):
     return langs
 
 # 根据语言获取参考情感列表
-def get_ref_audios(modelname, lang, version):
+def get_ref_audios(modelname: str, lang: str, version: str) -> list[str]:
     audios = glob(f"models/{version}/{modelname}/reference_audios/{lang}/emotions/*.wav")
     audio_list = []
     for audio in audios:
@@ -315,7 +315,7 @@ def get_multi_ref_template(version: str) -> tuple[list[str], str]:
     return template_list, msg
 
 # 创建说话人列表
-def create_speaker_list(version):
+def create_speaker_list(version: str) -> tuple[dict[str, dict[str, list[str]]], str]:
     spk_list = {}
     if not version_support(version):
         msg = "不支持该版本！"
