@@ -1,10 +1,13 @@
+""" GSVI服务器 """
+
 import os
+import io
 import sys
 from datetime import datetime
 from tools.logger import logger
 import pyfiglet
 pyfiglet.print_figlet("G S V I", "standard", "LIGHT_GREEN")
-from .exec_hook import set_exechook
+from .exec_hook import set_exechook , ExtractException
 set_exechook()
 if not (3, 9, 12) <= sys.version_info < (3, 12):
     logger.warning("python版本不在 3.9 - 3.11 之间，可能会遇到模块安装问题，如果你遇到了 ModuleNotFoundError，请安装这个区间内的python.")
@@ -15,7 +18,7 @@ from .openai_like_model import (
 )
 from tools.my_infer import get_multi_ref_template, create_speaker_list, single_infer, multi_infer, pre_infer, get_classic_model_list, classic_infer, get_version, check_installed, install_model, delete_model, openai_like_infer
 from fastapi import FastAPI, File, UploadFile, Request, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import argparse
@@ -50,6 +53,30 @@ APP.add_middleware(
     allow_methods=["*"],  # 允许的请求方法
     allow_headers=["*"],  # 允许的请求头
 )
+
+### EXCEPTION HANDLERS ###
+
+@APP.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """ 全局异常处理器 """
+    logger.error("发生了错误: \n")
+    exc_Information = ExtractException(type(exc), exc, exc.__traceback__)
+    logger.error(exc_Information)
+    return JSONResponse(content="GSVI服务器发射了一些错误导致未能处理请求，请查看终端知晓详情！", status_code=500)
+
+### EXCEPTION HANDLERS ###
+
+### MIDDLEWARES ###
+
+@APP.middleware("http")
+async def log_request(request: Request, call_next) -> Response:
+    req_from = f"({request.client.host}:{request.client.port})" if request.client else "UNKNOWN"
+    req_info = f"请求来自: {req_from} => {request.url} ({request.method})"
+    logger.trace(req_info)
+    response = await call_next(request)
+    return response
+
+### MIDDLEWARES ###
     
 # 初始化
 @APP.get("/api")
@@ -277,4 +304,4 @@ def main() -> None:
     pre_infer(args.config, ref_audio_path)
 
     webbrowser.open(f"http://127.0.0.1:{port}")
-    uvicorn.run(app=APP, host=host, port=port)
+    uvicorn.run(app=APP, host=host, port=port, log_level="critical")
