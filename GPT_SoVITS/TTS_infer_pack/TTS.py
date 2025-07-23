@@ -304,13 +304,11 @@ class TTS_Config:
             self.configs_path = config
             configs: dict = self._load_configs(self.configs_path)
 
-        if isinstance(config, dict):
-            version = config.get("version", "v2").lower()
-            if version not in ["v1", "v2", "v3", "v4", "v2Pro", "v2ProPlus"]:
-                raise RuntimeError(f"版本: {version} 不支持！")
-            self.default_configs[version] = config.get(version, self.default_configs[version])
-            self.configs: dict = config.get("custom", deepcopy(self.default_configs[version]))
-            self.version = version
+        assert isinstance(configs, dict)
+        configs_ = deepcopy(self.default_configs)
+        configs_.update(configs)
+        self.configs: dict = configs_.get("custom", configs_["v2"])
+        self.default_configs = deepcopy(configs_)
 
         self.device = self.configs.get("device", torch.device("cpu"))
         if "cuda" in str(self.device) and not torch.cuda.is_available():
@@ -318,10 +316,13 @@ class TTS_Config:
             self.device = torch.device("cpu")
 
         self.is_half = self.configs.get("is_half", False)
-        # if str(self.device) == "cpu" and self.is_half:
-        #     print(f"Warning: Half precision is not supported on CPU, set is_half to False.")
-        #     self.is_half = False
+        if str(self.device) == "cpu" and self.is_half:
+            print(f"Warning: Half precision is not supported on CPU, set is_half to False.")
+            self.is_half = False
 
+        version = self.configs.get("version", None)
+        self.version = version
+        assert self.version in ["v1", "v2", "v3", "v4", "v2Pro", "v2ProPlus"], "Invalid version!"
         self.t2s_weights_path = self.configs.get("t2s_weights_path", None)
         self.vits_weights_path = self.configs.get("vits_weights_path", None)
         self.bert_base_path = self.configs.get("bert_base_path", None)
@@ -577,6 +578,10 @@ class TTS:
         self.vits_model = vits_model
         if self.configs.is_half and str(self.configs.device) != "cpu":
             self.vits_model = self.vits_model.half()
+
+        self.configs.save_configs()
+
+
 
     def init_t2s_weights(self, weights_path: str):
         logger.info(f"Loading Text2Semantic weights from {weights_path}")
