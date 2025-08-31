@@ -195,7 +195,7 @@ is_half = any(dtype == torch.float16 for _, dtype, _, _ in tmp)
 
 #================================仅推理特化包才有================================
 # 强制GPU推理（False 为自动检测，如果实际是 4G 且为N卡，但是识别错误可开）
-force_gpu_infer = False
+force_gpu_infer = True
 
 # 强制半精度推理（False 为自动检测，4G显存如果要推理 V3~V4 可开。对于V2P，如果显卡计算能力低于 SM_53，无法半精部分会强制单精。只有开启了“强制GPU推理”才有效）
 force_half_infer = False
