@@ -114,7 +114,7 @@ async def infer_emotion(model: inferWithEmotions):
                 audio_url = ""
             else:
                 if model.dl_url == "":
-                    audio_url = f"http://{host}:{port}/{audio_path}"
+                    audio_url = f"/{audio_path}"
                 else:
                     audio_url = f"{model.dl_url}/{audio_path}"
     except Exception as e:
@@ -133,7 +133,7 @@ async def infer_multi(model: inferWithMulti):
         else:
             archive_path, msg = multi_infer(model.content, model.top_k, model.top_p, model.temperature, model.text_split_method, model.batch_size, model.batch_threshold, model.split_bucket, model.fragment_interval, model.media_type, model.parallel_infer, model.repetition_penalty, model.seed, model.sample_steps, model.if_sr)  
             if model.dl_url == "":
-                archive_url = f"http://{host}:{port}/{archive_path}"
+                archive_url = f"/{archive_path}"
             else:
                 archive_url = f"{model.dl_url}/{archive_path}"
     except Exception as e:
@@ -167,7 +167,7 @@ async def infer_classic(model: inferWithClassic):
                 audio_url = ""
             else:
                 if model.dl_url == "":
-                    audio_url = f"http://{host}:{port}/{audio_path}"
+                    audio_url = f"/{audio_path}"
                 else:
                     audio_url = f"{model.dl_url}/{audio_path}"
     except Exception as e:
@@ -295,13 +295,12 @@ def main() -> None:
     parser.add_argument("-r","--ref_audio", type=str, default="./custom_refs", help="参考音频路径")
     args = parser.parse_args()
     
-    logger.info(f"服务即将启动，将运行在: http://127.0.0.1:{port}")
     infer_key = args.key
     host = args.host
     port = args.port
     ref_audio_path = args.ref_audio
         
     pre_infer(args.config, ref_audio_path)
-
+    logger.info(f"服务即将启动，将运行在: http://127.0.0.1:{port}")
     webbrowser.open(f"http://127.0.0.1:{port}")
-    uvicorn.run(app=APP, host=host, port=port, log_level="critical")
+    uvicorn.run(app=APP, host=host, port=port, log_level="critical")    
