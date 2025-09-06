@@ -3,11 +3,9 @@ custom:
   cnhuhbert_base_path: GPT_SoVITS/pretrained_models/chinese-hubert-base
   device: cuda
   is_half: false
-  t2s_weights_path: "models/v4/\u5D29\u574F\u4E09-\u4E2D\u6587-\u7231\u8389\u5E0C\u96C5\
-    /\u7231\u8389\u5E0C\u96C5-e10.ckpt"
-  version: v4
-  vits_weights_path: "models/v4/\u5D29\u574F\u4E09-\u4E2D\u6587-\u7231\u8389\u5E0C\
-    \u96C5/\u7231\u8389\u5E0C\u96C5_e10_s270_l32.pth"
+  t2s_weights_path: GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt
+  version: v2
+  vits_weights_path: GPT_SoVITS/pretrained_models/gsv-v2final-pretrained/s2G2333k.pth
 v1:
   bert_base_path: GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large
   cnhuhbert_base_path: GPT_SoVITS/pretrained_models/chinese-hubert-base
